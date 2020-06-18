@@ -172,6 +172,9 @@ private:
     /** Add a tx to the block */
     void AddToBlock(CTxMemPool::txiter iter);
 
+    /** Returns the smallest max weight from both the consensus rules and user options */ 
+    unsigned int blockMaxWeight(void) const;
+
     // Methods for how to add transactions to a block.
     /** Add transactions based on feerate including unconfirmed ancestors
       * Increments nPackagesSelected / nDescendantsUpdated with corresponding
