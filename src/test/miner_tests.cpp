@@ -16,6 +16,7 @@
 #include <util/system.h>
 #include <util/time.h>
 #include <validation.h>
+#include <maxblockweight.h>
 
 #include <test/util/setup_common.h>
 
@@ -53,7 +54,7 @@ BlockAssembler MinerTestingSetup::AssemblerForTest(const CChainParams& params)
 {
     BlockAssembler::Options options;
 
-    options.nBlockMaxWeight = MAX_BLOCK_WEIGHT;
+    options.nBlockMaxWeight = MaxMinedBlockWeight();
     options.blockMinFeeRate = blockMinFeeRate;
     return BlockAssembler(*m_node.mempool, params, options);
 }
@@ -268,7 +269,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     const CAmount HIGHFEE = COIN;
     const CAmount HIGHERFEE = 4*COIN;
 
-    // block sigops > limit: 1000 CHECKMULTISIG + 1
+    // block sigops > limit: 3000 CHECKMULTISIG + 1
     tx.vin.resize(1);
     // NOTE: OP_NOP is used to force 20 SigOps for the CHECKMULTISIG
     tx.vin[0].scriptSig = CScript() << OP_0 << OP_0 << OP_0 << OP_NOP << OP_CHECKMULTISIG << OP_1;
@@ -276,7 +277,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     tx.vin[0].prevout.n = 0;
     tx.vout.resize(1);
     tx.vout[0].nValue = BLOCKSUBSIDY;
-    for (unsigned int i = 0; i < 1001; ++i)
+    for (unsigned int i = 0; i < 3001; ++i)
     {
         tx.vout[0].nValue -= LOWFEE;
         hash = tx.GetHash();
@@ -526,4 +527,40 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     fCheckpointsEnabled = true;
 }
 
+static uint32_t pv(const char* s)
+{
+    std::string sx(s);
+    uint32_t p = BlockWeightFindVote(sx);
+    return p;
+}
+
+BOOST_AUTO_TEST_CASE(bipbbb_vote_parser)
+{
+    BOOST_CHECK_EQUAL(pv("dsfasdf/BIPBBB/X55/sadfadqa"), 55);
+    BOOST_CHECK_EQUAL(pv("dsf$%@$#/././asdf/BIPBBB/X55/sadfad//qa"), 55);
+    BOOST_CHECK_EQUAL(pv("dsfasdf/BIPBBB/X2/sadfadqa"),2);
+    BOOST_CHECK_EQUAL(pv("dsfasdf/BIPBBB/X1/sadfadqa"),1);
+    BOOST_CHECK_EQUAL(pv("dsfasdf/BIPBBB/X1"),0);
+    BOOST_CHECK_EQUAL(pv("/BIPBBB/X1"),0);
+    BOOST_CHECK_EQUAL(pv("/BIPBBB/X17237/"),17237);
+    BOOST_CHECK_EQUAL(pv("/BIPBBB/X99999/"),99999);
+    BOOST_CHECK_EQUAL(pv("/BIPBBB/X100000/"),0);
+    BOOST_CHECK_EQUAL(pv("/BIPBBB/X172378888/"),0);
+    BOOST_CHECK_EQUAL(pv("/BIPBBB/X/"),0);
+    BOOST_CHECK_EQUAL(pv("/BIPBBB/X4f/"),0);
+    BOOST_CHECK_EQUAL(pv("/BIBB/X4/"),0);
+    BOOST_CHECK_EQUAL(pv("/BIPBBB/X2/sadfadqa"),2);    
+    BOOST_CHECK_EQUAL(pv("ds\t\n\r\vfasdf/BIPBBB/X55/sadfadqa"), 55);
+    BOOST_CHECK_EQUAL(pv("ds\x30\n\r\vfasdf/BIPBBB/X55/sadfadqa"), 55);
+    BOOST_CHECK_EQUAL(pv("ds\x20\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0A\x0B\x0C\x0D\x0E\x0F\vfasdf/BIPBBB/X55/sadfadqa"), 55);
+    BOOST_CHECK_EQUAL(pv("ds\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1A\x1B\x1C\x1D\x1E\x1F\vfasdf/BIPBBB/X55/sadfadqa"), 55);
+
+    // test all ascii excape chars in the middle of the string   
+    const char *tn = "ds\x30\n\r\vfasdf/BIPBBB/X888/sadfadqa";
+    std::string sx(tn);
+    for (int i = 0; i < 0xFF; i++) {
+       sx[2] = (char) i;
+       BOOST_CHECK_EQUAL(BlockWeightFindVote(sx), 888);
+    }
+}
 BOOST_AUTO_TEST_SUITE_END()
