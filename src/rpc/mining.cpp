@@ -639,8 +639,10 @@ static UniValue getblocktemplate(const JSONRPCRequest& request)
     result.pushKV("mintime", (int64_t)pindexPrev->GetMedianTimePast()+1);
     result.pushKV("mutable", aMutable);
     result.pushKV("noncerange", "00000000ffffffff");
-    int64_t nSigOpLimit = MAX_BLOCK_SIGOPS_COST;
-    int64_t nSizeLimit = MAX_BLOCK_SERIALIZED_SIZE;
+    int64_t nSigOpLimit = MaxMinedBlockSigopsCost();
+    // BUG??? there is probably a bug here. The generated max block weight is the lower of the MaxMinedBlockWeight()
+    // and the -blockmaxweight command line param. But I shall leave it to people wiser then I to fix.
+    int64_t nSizeLimit = MaxMinedBlockWeight();
     if (fPreSegWit) {
         assert(nSigOpLimit % WITNESS_SCALE_FACTOR == 0);
         nSigOpLimit /= WITNESS_SCALE_FACTOR;
@@ -650,7 +652,7 @@ static UniValue getblocktemplate(const JSONRPCRequest& request)
     result.pushKV("sigoplimit", nSigOpLimit);
     result.pushKV("sizelimit", nSizeLimit);
     if (!fPreSegWit) {
-        result.pushKV("weightlimit", (int64_t)MAX_BLOCK_WEIGHT);
+        result.pushKV("weightlimit", (int64_t)MaxMinedBlockWeight());
     }
     result.pushKV("curtime", pblock->GetBlockTime());
     result.pushKV("bits", strprintf("%08x", pblock->nBits));
